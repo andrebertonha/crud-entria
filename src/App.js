@@ -2,16 +2,17 @@ import React from 'react';
 import './App.css';
 import fetchGraphQL from './fetchGraphQL';
 import graphql from 'babel-plugin-relay/macro';
-import {
-  RelayEnvironmentProvider,
-  preloadQuery,
-  usePreloadedQuery,
-} from 'react-relay/hooks';
+
+import { 
+    RelayEnvironmentProvider,
+    preloadQuery,
+    usePreloadedQuery,
+  } from 'react-relay/hooks';
+
 import RelayEnvironment from './RelayEnvironment';
 
 const { Suspense } = React;
 
-// Define a query
 const RepositoryNameQuery = graphql`
   query AppRepositoryNameQuery {
     repository(owner: "facebook", name: "relay") {
@@ -20,30 +21,46 @@ const RepositoryNameQuery = graphql`
   }
 `;
 
-const preloadedQuery = preloadQuery(RelayEnvironment, RepositoryNameQuery, {
-  /* query variables */
-});
+const { useState, useEffect } = React;
 
-function App(props) {
-  const data = usePreloadedQuery(RepositoryNameQuery, props.preloadedQuery);
+function App() {
+
+  const [name, setName] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchGraphQL(`
+      query RepositoryNameQuery {
+        # feel free to change owner/name here
+        repository(owner: "facebook" name: "relay") {
+          name
+        }
+      }
+    `).then(response => {
+      if(!isMounted) {
+        return;
+      }
+      const data = response.data;
+      setName(data.repository.name);
+    }).catch(error => {
+      console.error(error);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+
+  }, [fetchGraphQL]);
 
   return (
     <div className="App">
       <header className="App-header">
-        <p>{data.repository.name}</p>
+        <p>
+          {name != null ? `Repository: ${name}` : "Loading"}
+        </p>
       </header>
     </div>
   );
 }
 
-function AppRoot(props) {
-  return (
-    <RelayEnvironmentProvider environment={RelayEnvironment}>
-      <Suspense fallback={'Loading...'}>
-        <App preloadedQuery={preloadedQuery} />
-      </Suspense>
-    </RelayEnvironmentProvider>
-  );
-}
-
-export default AppRoot;
+export default App;
